@@ -1,10 +1,13 @@
+import random
 from typing import Tuple, List
 from torch.utils.data import IterableDataset, DataLoader, get_worker_info
-from torchvision.datasets import Flickr30k
 from transformers import CLIPProcessor
 from PIL import Image
+from datasets import load_dataset
+import requests
+from io import BytesIO
 
-class Flickr30kIterableDataset(IterableDataset):
+class Flickr30kHFDataset(IterableDataset):
     """
     IterableDataset that yields dicts:
       {
@@ -14,39 +17,30 @@ class Flickr30kIterableDataset(IterableDataset):
       }
     Shards its sample list automatically across workers.
     """
-    def __init__(
-        self,
-        root: str,
-        ann_file: str,
-        processor: CLIPProcessor,
-        max_length: int = 32,
-    ):
-        # load raw image paths + captions
-        base = Flickr30k(root=root, ann_file=ann_file)
-        samples: List[Tuple[str,str]] = []
-        for img, caps in base:
-            path = img.filename
-            for cap in caps:
-                samples.append((path, cap))
-        self.samples = samples
+    def __init__(self, hf_dataset, processor, max_length=32):
+        self.dataset = hf_dataset
         self.processor = processor
         self.max_length = max_length
 
     def __iter__(self):
         worker = get_worker_info()
+        n = len(self.dataset)
         if worker is None:
-            start = 0
-            end = len(self.samples)
+            start, end = 0, n
         else:
-            # evenly split samples across workers
-            per_worker = int(len(self.samples) / worker.num_workers)
+            per_worker = int(n / worker.num_workers)
             worker_id = worker.id
             start = worker_id * per_worker
-            # last worker takes the rest
-            end = start + per_worker if worker_id < worker.num_workers - 1 else len(self.samples)
+            end = start + per_worker if worker_id < worker.num_workers - 1 else n
 
-        for path, caption in self.samples[start:end]:
-            image = Image.open(path).convert("RGB")
+        for item in self.dataset:
+            image = item["image"]
+            # Download image from URL
+            # response = requests.get(item["image"])
+            # image = Image.open(BytesIO(response.content)).convert("RGB")
+            # Each item has a list of 5 captions, you can pick one or use all
+            caption = random.choice(item["caption"])  # or random.choice(item["caption"]
+
             out = self.processor(
                 text=[caption],
                 images=[image],
@@ -55,25 +49,26 @@ class Flickr30kIterableDataset(IterableDataset):
                 max_length=self.max_length,
                 return_tensors="pt",
             )
-            input_ids = out["input_ids"][0]        # (T,)
-            pixel_values = out["pixel_values"][0]  # (3,H,W)
-            decoder_input = input_ids[:-1]         # drop last token
-            label        = input_ids[1:]           # drop first token
+            input_ids = out["input_ids"][0]
+            pixel_values = out["pixel_values"][0]
+            decoder_input = input_ids[:-1]
+            label = input_ids[1:]
 
             yield {
                 "pixel_values": pixel_values,
-                "input_ids":    decoder_input,
-                "labels":       label,
+                "input_ids": decoder_input,
+                "labels": label,
             }
 
 if __name__ == "__main__":
-    # instantiate processor
+    print("HELLO WORLD")
     processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-
-    # make the iterable dataset
-    ds = Flickr30kIterableDataset(
-        root="./data",
-        ann_file="./data/Flickr30k.token.txt",
+    # Load the Hugging Face Flickr30k dataset (test split as example)
+    hf_dataset = load_dataset("nlphuji/flickr30k", split="test")
+    print(hf_dataset[0])
+    print("getting here?")
+    ds = Flickr30kHFDataset(
+        hf_dataset=hf_dataset,
         processor=processor,
         max_length=32,
     )
@@ -87,10 +82,7 @@ if __name__ == "__main__":
     )
 
     for batch in loader:
-        # batch["pixel_values"]: (B,3,H,W)
-        # batch["input_ids"]:    (B,T-1)
-        # batch["labels"]:       (B,T-1)
-        print(batch["pixel_values"].shape,
-              batch["input_ids"].shape,
-              batch["labels"].shape)
+        print(batch["pixel_values"].shape, #(B,3,H,W)
+              batch["input_ids"].shape, #(B,T-1)
+              batch["labels"].shape) #(B,T-1)
         break
