@@ -1,5 +1,6 @@
-## NOTE: This training loop keeps the CLIP encoder and Qwen decoder layers frozen
-## whilst training ONLY the projector layers
+## NOTE: This training loop keeps the CLIP encoder frozen,
+## partially trains the Qwen layers
+## and fully trains the projector layers which bridge CLIP to Qwen
 
 import torch
 import torch.nn as nn
