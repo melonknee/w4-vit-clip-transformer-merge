@@ -5,8 +5,8 @@ from torch.utils.data import DataLoader
 from transformers import CLIPProcessor
 from tqdm import tqdm
 
-from dataloader import Flickr30kIterableDataset
-from models import CLIPCaptioningModel
+from Andrew.dataloader import Flickr30kIterableDataset
+from Andrew.models import CLIPCaptioningModel
 
 def train(
     model: nn.Module,

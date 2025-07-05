@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from transformers import CLIPVisionModel, CLIPTokenizer
+from transformers import CLIPVisionModel, CLIPTokenizer, AutoTokenizer, AutoModelForCausalLM
 
 class CLIPCaptioningModel(nn.Module):
     def __init__(self,
@@ -14,7 +14,7 @@ class CLIPCaptioningModel(nn.Module):
         # 1) Load CLIP’s vision encoder
         self.clip_encoder = CLIPVisionModel.from_pretrained(clip_model_name)
         # freeze CLIP weights if you only want to train the decoder:
-        # for p in self.clip_encoder.parameters(): p.requires_grad = False
+        for param in self.clip_encoder.parameters(): param.requires_grad = False
 
         # 2) Tokenizer / embeddings for your decoder
         self.tokenizer = CLIPTokenizer.from_pretrained(clip_model_name)
@@ -78,3 +78,11 @@ class CLIPCaptioningModel(nn.Module):
         decoded = decoded.permute(1, 0, 2)  # (B, T, D)
         logits = self.output_proj(decoded)  # (B, T, vocab_size)
         return logits
+
+
+# Lord the Qwen3 base model and tokeniser
+qwen_dec_model_name = "Qwen/Qwen3-0.6B-Base"
+tokeniser = AutoTokenizer.from_pretrained(qwen_dec_model_name)
+decoder = AutoModelForCausalLM.from_pretrained(qwen_dec_model_name)
+
+
