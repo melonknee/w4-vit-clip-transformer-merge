@@ -7,18 +7,24 @@ from PIL import Image
 clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 clip_model.eval()
+# Freeze the CLIP model
+for param in clip_model.parameters():
+    param.requires_grad = False
 
 # ====== Step 2: Load Qwen decoder ======
 qwen_model_name = "Qwen/Qwen3-0.6B-Base"  # or "Qwen/Qwen1.5-0.6B" if released
 qwen_tokenizer = AutoTokenizer.from_pretrained(qwen_model_name, trust_remote_code=True)
 qwen_model = AutoModelForCausalLM.from_pretrained(qwen_model_name, trust_remote_code=True)
 qwen_model.eval()
+# Freeze the Qwen model
+for param in qwen_model.parameters():
+    param.requires_grad = False
 
 # ====== Step 3: Build the projection layer ======
 # Qwen hidden size is 2048 (for 0.5B model); adjust if using 0.6B
 qwen_hidden_size = qwen_model.config.hidden_size
 projector = nn.Linear(512, qwen_hidden_size)  # CLIP: 512-d → Qwen hidden size
-projector.eval()
+# projector.eval() # ONLY TURN THIS ON FOR INFERENCE!!!
 
 # ====== Step 4: Load and preprocess an image ======
 image = Image.open("happy_bes.jpg")  # Make sure this image exists!
